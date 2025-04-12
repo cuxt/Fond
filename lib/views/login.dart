@@ -20,20 +20,22 @@ class _LoginState extends State<Login> {
 
   // 登录
   void _login() async {
-    String username = _usernameController.text;
-    String password = _passwordController.text;
+    // String username = _usernameController.text;
+    // String password = _passwordController.text;
+    String username = "shanghai1563";
+    String password = "1wGx0B94";
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      await Auth.login(username, password);
-      showToast("登录成功");
+      final isLogin = await Auth.login(username, password);
+      if (!isLogin) {
+        return;
+      }
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => const NavBar(),
-        ),
+        MaterialPageRoute(builder: (context) => const NavBar()),
       );
     } catch (e) {
       showToast(e.toString());
