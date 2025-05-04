@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class FondButton extends StatelessWidget {
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final String buttonText;
   final Color? color;
 
@@ -16,7 +16,7 @@ class FondButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 24,vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         backgroundColor: color ?? Theme.of(context).primaryColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),

@@ -1,10 +1,12 @@
-import 'package:oktoast/oktoast.dart';
+import 'package:flutter/material.dart';
+import 'package:fond/widgets/toast/fond_toast.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart';
 import 'package:pointycastle/asymmetric/api.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_gbk2utf8/flutter_gbk2utf8.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xml/xml.dart';
 
 class Auth {
@@ -62,30 +64,82 @@ class Auth {
         options: Options(responseType: ResponseType.bytes),
       );
 
+      // 检查响应状态码
+      if (response.statusCode != 200) {
+        FondToast.show('请求失败，状态码: ${response.statusCode}');
+        return false;
+      }
+
+      // 确保响应数据不为空
+      if (response.data == null || response.data!.isEmpty) {
+        FondToast.show('服务器返回数据为空');
+        return false;
+      }
+
       String decodedString = gbk.decode(response.data!);
+
       // 解析 XML 数据
       final document = XmlDocument.parse(decodedString);
-      final verifyElement = document.findElements('verify').first;
-      final retElement = verifyElement.findElements('ret').first;
-      final code = retElement.getAttribute('code');
-      final msg = retElement.getAttribute('msg');
 
-      if (response.statusCode == 200) {
-        if (code == '-1') {
-          showToast(msg!);
-          return false;
+      // 确保能找到必要的XML元素
+      final verifyElements = document.findElements('verify');
+      if (verifyElements.isEmpty) {
+        FondToast.show('服务器返回数据格式错误');
+        return false;
+      }
+
+      final verifyElement = verifyElements.first;
+      final retElements = verifyElement.findElements('ret');
+
+      if (retElements.isEmpty) {
+        FondToast.show('服务器返回数据不包含结果信息');
+        return false;
+      }
+
+      final retElement = retElements.first;
+      final code = retElement.getAttribute('code');
+      final msg = retElement.getAttribute('msg') ?? '未知错误';
+
+      // 根据返回码判断登录是否成功
+      if (code == '0') {
+        // 登录成功情况
+        FondToast.show('登录成功');
+        final cookies = response.headers['set-cookie'];
+        if (cookies != null && cookies.isNotEmpty) {
+          Map<String, String> cookieMap = {};
+
+          for (var rawCookie in cookies) {
+            // 删除空格，分号分割
+            List<String> parts = rawCookie.replaceAll(' ', '').split(';');
+            for (var part in parts) {
+              if (part.contains('=')) {
+                List<String> keyValue = part.split('=');
+                if (keyValue.length == 2) {
+                  String key = keyValue[0].trim();
+                  String value = keyValue[1].trim();
+                  cookieMap[key] = value;
+                }
+              }
+            }
+          }
+
+          debugPrint('登录成功 - cookie: $cookieMap');
+          // 保存cookie到本地
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('cookie', jsonEncode(cookieMap));
         }
-        // 请求成功，处理响应数据
-        showToast('登录成功');
+
         return true;
       } else {
-        // 请求失败，处理错误
-        showToast('Request failed with status: ${response.statusCode}');
+        debugPrint('登录响应 - code: $code, msg: $msg');
+        FondToast.show('登录失败: $msg');
+        return false;
       }
     } catch (e) {
-      showToast(e.toString());
+      // 捕获并处理所有异常
+      debugPrint('登录异常: ${e.toString()}');
+      FondToast.show('登录失败: ${e.toString()}');
+      return false;
     }
-
-    return false;
   }
 }
