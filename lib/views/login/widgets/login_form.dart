@@ -76,7 +76,22 @@ class LoginForm extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 20),
+
+        // 记住密码选项
+        Row(
+          children: [
+            Checkbox(
+              value: loginProvider.rememberPassword,
+              onChanged: (value) => loginProvider.toggleRememberPassword(),
+            ),
+            Text(
+              '记住密码',
+              style: TextStyle(fontSize: 14, color: colorScheme.onSurface),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
 
         // 登录按钮
         loginProvider.isLoading

@@ -1,7 +1,7 @@
 import 'package:go_router/go_router.dart';
 import 'package:fond/providers/auth_provider.dart';
 import 'package:fond/views/about/about_screen.dart';
-import 'package:fond/views/convertible_bond/convertible_bond_screen.dart';
+import 'package:fond/views/convertible_bond/convertible_bond_config_screen.dart';
 import 'package:fond/views/home/home_screen.dart';
 import 'package:fond/views/login/login_screen.dart';
 import 'package:fond/views/settings/settings_screen.dart';
@@ -46,17 +46,15 @@ class AppRouter {
                 child: const HomeScreen(),
               ),
             ),
-      ),
-
-      // 可转债页面
+      ), // 可转债页面
       GoRoute(
         path: '/convertible-bonds',
         pageBuilder:
             (context, state) => NoTransitionPage(
               child: DesktopScaffold(
                 selectedIndex: 3,
-                title: '可转债',
-                child: const ConvertibleBondScreen(),
+                title: '可转债数据分析',
+                child: const ConvertibleBondConfigScreen(),
               ),
             ),
       ),

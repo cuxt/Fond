@@ -2,11 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:fond/providers/auth_provider.dart';
 import 'package:fond/providers/theme_provider.dart';
 import 'package:fond/routes/app_router.dart';
+import 'package:fond/services/database/database_service.dart';
+import 'package:fond/utils/sqlite_utils.dart';
 import 'package:fond/widgets/toast/fond_toast.dart';
 import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 初始化SQLite
+  await initializeSqlite();
+
+  // 初始化数据库服务
+  try {
+    final dbService = DatabaseService();
+    await dbService.initialize();
+  } catch (e) {
+    debugPrint('初始化数据库服务失败: $e');
+    // 数据库初始化失败不应该阻止应用启动
+  }
+
   runApp(const FondApp());
 }
 
@@ -50,14 +65,12 @@ class _AppWithProvidersState extends State<AppWithProviders> {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-
     return MaterialApp.router(
       title: 'Fond',
       scaffoldMessengerKey: FondToast.navigatorKey,
       theme: themeProvider.currentTheme,
       // 使用GoRouter配置
-      routerConfig: _appRouter.router,
-      // 去除右上角的Debug标签
+      routerConfig: _appRouter.router, // 去除右上角的Debug标签
       debugShowCheckedModeBanner: false,
     );
   }

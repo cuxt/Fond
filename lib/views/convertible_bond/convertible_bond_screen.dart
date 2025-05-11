@@ -3,7 +3,6 @@ import 'package:fond/views/convertible_bond/models/convertible_bond.dart';
 import 'package:fond/views/convertible_bond/services/convertible_bond_service.dart';
 import 'package:fond/views/convertible_bond/utils/bond_filter.dart';
 import 'package:fond/views/convertible_bond/utils/bond_sorter.dart';
-import 'package:fond/views/convertible_bond/widgets/bond_pagination_widget.dart';
 import 'package:fond/views/convertible_bond/widgets/bond_search_filter_widget.dart';
 import 'package:fond/views/convertible_bond/widgets/bond_table_widget.dart';
 import 'package:fond/widgets/fond_button.dart';
@@ -19,14 +18,15 @@ class ConvertibleBondScreen extends StatefulWidget {
 class _ConvertibleBondScreenState extends State<ConvertibleBondScreen> {
   // 服务和数据
   final ConvertibleBondService _bondService = ConvertibleBondService();
-  List<ConvertibleBond> _bonds = [];
-
-  // 状态管理
+  List<ConvertibleBond> _bonds = []; // 状态管理
   bool _isLoading = false;
   String _errorMessage = '';
   int _totalCount = 0;
-  int _currentPage = 1;
-  final int _pageSize = 50;
+  final int _pageSize = 600; // 一次性加载600条数据
+
+  // 日期选择
+  late DateTime _selectedDate;
+  String _formattedDate = '';
 
   // UI控制
   late List<Map<String, dynamic>> _tableHeaders = [];
@@ -40,10 +40,11 @@ class _ConvertibleBondScreenState extends State<ConvertibleBondScreen> {
   String _filterBondType = '全部';
   final List<String> _bondTypes = ['全部', 'A股', 'B股', '上证', '深证'];
   final TextEditingController _searchController = TextEditingController();
-
   @override
   void initState() {
     super.initState();
+    _selectedDate = DateTime.now();
+    _formattedDate = DateFormat('yyyyMMdd').format(_selectedDate);
     _loadData();
   }
 
@@ -75,14 +76,34 @@ class _ConvertibleBondScreenState extends State<ConvertibleBondScreen> {
     });
   }
 
-  // 获取今天日期，格式为yyyyMMdd
-  String _getTodayDate() {
-    final now = DateTime.now();
-    return DateFormat('yyyyMMdd').format(now);
+  // 获取当前选择的日期，格式为yyyyMMdd
+  String _getFormattedDate() {
+    return _formattedDate;
+  }
+
+  // 打开日期选择器
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2010),
+      lastDate: DateTime.now(),
+      // 不使用locale参数，避免依赖flutter_localizations
+    );
+
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+        _formattedDate = DateFormat('yyyyMMdd').format(_selectedDate);
+      });
+
+      // 使用新选择的日期加载数据
+      await _loadData(forceRefresh: false);
+    }
   }
 
   // 加载可转债数据
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool forceRefresh = false}) async {
     if (_isLoading) return;
 
     setState(() {
@@ -91,12 +112,13 @@ class _ConvertibleBondScreenState extends State<ConvertibleBondScreen> {
     });
 
     try {
-      final begin = (_currentPage - 1) * _pageSize + 1;
+      // 始终从第1条数据开始，一次性加载所有数据
       final response = await _bondService.getConvertibleBonds(
-        date: _getTodayDate(),
-        begin: begin,
-        count: _pageSize,
-        page: _currentPage,
+        date: _getFormattedDate(),
+        begin: 1, // 固定从第1条开始
+        count: _pageSize, // 一次性加载600条
+        page: 1, // 固定第1页
+        forceRefresh: forceRefresh,
       );
 
       // 设置表头数据
@@ -115,31 +137,31 @@ class _ConvertibleBondScreenState extends State<ConvertibleBondScreen> {
         _isLoading = false;
       });
     }
-  }
+  } // 刷新数据
 
-  // 刷新数据
   Future<void> _refreshData() async {
-    setState(() {
-      _currentPage = 1;
-    });
-    await _loadData();
+    await _loadData(forceRefresh: true); // 强制刷新，不使用缓存
   }
 
-  // 加载下一页
-  void _loadNextPage() {
+  // 前一天
+  void _goToPreviousDay() {
     setState(() {
-      _currentPage++;
+      _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+      _formattedDate = DateFormat('yyyyMMdd').format(_selectedDate);
     });
-    _loadData();
+    _loadData(forceRefresh: false);
   }
 
-  // 加载上一页
-  void _loadPreviousPage() {
-    if (_currentPage > 1) {
+  // 后一天
+  void _goToNextDay() {
+    // 不能超过今天
+    final now = DateTime.now();
+    if (_selectedDate.isBefore(now)) {
       setState(() {
-        _currentPage--;
+        _selectedDate = _selectedDate.add(const Duration(days: 1));
+        _formattedDate = DateFormat('yyyyMMdd').format(_selectedDate);
       });
-      _loadData();
+      _loadData(forceRefresh: false);
     }
   }
 
@@ -194,7 +216,52 @@ class _ConvertibleBondScreenState extends State<ConvertibleBondScreen> {
                   '可转债列表',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
-                FondButton(onTap: _refreshData, buttonText: '刷新'),
+                Row(
+                  children: [
+                    // 日期选择按钮
+                    InkWell(
+                      onTap: () => _selectDate(context),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Theme.of(context).dividerColor,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${_formattedDate.substring(0, 4)}-${_formattedDate.substring(4, 6)}-${_formattedDate.substring(6, 8)}',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.calendar_today, size: 16),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // 前一天按钮
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back_ios, size: 16),
+                      onPressed: _goToPreviousDay,
+                      tooltip: '前一天',
+                    ),
+                    // 后一天按钮
+                    IconButton(
+                      icon: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onPressed: _goToNextDay,
+                      tooltip: '后一天',
+                    ),
+                    const SizedBox(width: 16),
+                    FondButton(onTap: _refreshData, buttonText: '刷新'),
+                  ],
+                ),
               ],
             ),
           ),
@@ -205,16 +272,16 @@ class _ConvertibleBondScreenState extends State<ConvertibleBondScreen> {
             filterBondType: _filterBondType,
             bondTypes: _bondTypes,
             onFilterChanged: _handleFilterTypeChanged,
-          ),
-
-          // 数据统计区
+          ), // 数据统计区
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
-                Text('总数: $_totalCount'),
+                Text(
+                  '日期: ${_formattedDate.substring(0, 4)}-${_formattedDate.substring(4, 6)}-${_formattedDate.substring(6, 8)}',
+                ),
                 const SizedBox(width: 16),
-                Text('当前页: $_currentPage'),
+                Text('总数: $_totalCount'),
                 const SizedBox(width: 16),
                 Text('筛选结果: ${filteredBonds.length}'),
               ],
@@ -236,9 +303,9 @@ class _ConvertibleBondScreenState extends State<ConvertibleBondScreen> {
 
           // 加载中提示
           if (_isLoading && _bonds.isEmpty)
-            const Expanded(child: Center(child: CircularProgressIndicator())),
-
-          // 表格区域
+            const Expanded(
+              child: Center(child: CircularProgressIndicator()),
+            ), // 表格区域
           if (_bonds.isNotEmpty)
             Expanded(
               child: BondTableWidget(
@@ -250,16 +317,6 @@ class _ConvertibleBondScreenState extends State<ConvertibleBondScreen> {
                 sortAscending: _sortAscending,
                 isLoading: _isLoading,
               ),
-            ),
-
-          // 分页操作
-          if (_bonds.isNotEmpty)
-            BondPaginationWidget(
-              currentPage: _currentPage,
-              pageSize: _pageSize,
-              itemCount: _bonds.length,
-              onPrevious: _loadPreviousPage,
-              onNext: _loadNextPage,
             ),
         ],
       ),

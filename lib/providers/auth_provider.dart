@@ -20,7 +20,11 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // 登录
-  Future<bool> login(String username, String password) async {
+  Future<bool> login(
+    String username,
+    String password, [
+    bool rememberPassword = false,
+  ]) async {
     _isLoading = true;
     notifyListeners();
 
@@ -34,6 +38,11 @@ class AuthProvider extends ChangeNotifier {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('isLoggedIn', true);
         await prefs.setString('username', username);
+
+        // 如果选择不记住密码，清除保存的密码
+        if (!rememberPassword) {
+          await prefs.remove('savedPassword');
+        }
       }
       return success;
     } catch (e) {
@@ -53,6 +62,12 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLoggedIn', false);
     await prefs.remove('username');
+
+    // 如果用户未选择记住密码，也清除保存的密码
+    final rememberPassword = prefs.getBool('rememberPassword') ?? false;
+    if (!rememberPassword) {
+      await prefs.remove('savedPassword');
+    }
 
     notifyListeners();
   }

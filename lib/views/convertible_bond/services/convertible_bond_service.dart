@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:fond/services/database/database_service.dart';
 import 'package:fond/views/convertible_bond/models/convertible_bond.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -9,6 +10,7 @@ class ConvertibleBondService {
   final Dio _dio = Dio();
   final String _baseUrl =
       'http://ft.10jqka.com.cn/standardgwapi/api/iFindService/query/v1/ifind_web';
+  final DatabaseService _databaseService = DatabaseService();
 
   /// 获取可转债列表数据
   Future<ConvertibleBondResponse> getConvertibleBonds({
@@ -17,8 +19,30 @@ class ConvertibleBondService {
     int begin = 1, // 开始位置
     int count = 100, // 数量
     int page = 1, // 页码
+    bool forceRefresh = false, // 强制刷新，不使用缓存
   }) async {
     try {
+      // 初始化数据库服务
+      if (!_databaseService.isInitialized) {
+        await _databaseService.initialize();
+      }
+
+      // 1. 如果不强制刷新，先尝试从数据库获取数据
+      if (!forceRefresh) {
+        final hasData = await _databaseService.hasConvertibleBondData(date);
+        if (hasData) {
+          debugPrint('从数据库获取$date的可转债数据');
+          final cachedResponse = await _databaseService
+              .getConvertibleBondsByDate(date);
+          if (cachedResponse != null) {
+            return cachedResponse;
+          }
+        }
+      }
+
+      // 2. 如果数据库中没有数据或强制刷新，则从API获取
+      debugPrint('从API获取$date的可转债数据');
+
       // 获取 cookie 数据
       final prefs = await SharedPreferences.getInstance();
       final cookie = prefs.getString('cookie') ?? '';
@@ -91,9 +115,21 @@ class ConvertibleBondService {
           if (kDebugMode) {
             prefs.setString('last_bonds_response', jsonEncode(responseData));
           }
-
           final resultResponse = ConvertibleBondResponse.fromJson(responseData);
           debugPrint('成功解析数据，获取到${resultResponse.bonds.length}条可转债信息');
+
+          // 3. 将API获取的数据保存到数据库中
+          try {
+            await _databaseService.saveConvertibleBondResponse(
+              resultResponse,
+              date,
+            );
+            debugPrint('成功将可转债数据保存到数据库');
+          } catch (dbError) {
+            // 数据库保存失败不影响正常功能，仅记录错误
+            debugPrint('保存数据到数据库失败，但API数据获取成功: $dbError');
+          }
+
           return resultResponse;
         } else {
           final errorMsg = 'API返回的数据格式不正确: ${response.data.runtimeType}';
@@ -131,6 +167,20 @@ class ConvertibleBondService {
     } catch (e) {
       debugPrint('获取可转债数据异常: $e');
       throw Exception('获取可转债数据失败: $e');
+    }
+  }
+
+  /// 清除数据库中的所有数据
+  Future<void> clearAllCachedData() async {
+    try {
+      if (!_databaseService.isInitialized) {
+        await _databaseService.initialize();
+      }
+      await _databaseService.clearAllData();
+      debugPrint('已清除所有缓存的可转债数据');
+    } catch (e) {
+      debugPrint('清除缓存数据失败: $e');
+      throw Exception('清除缓存数据失败: $e');
     }
   }
 }
