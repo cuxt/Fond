@@ -1,93 +1,46 @@
-name: Flutter 自动化打包
+name: Flutter Windows Build
 
 on:
   push:
-    branches:
-      - master
-
-# 并发策略
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.number || github.ref }}
-  # 如果有新的运行实例，取消正在进行的实例
-  cancel-in-progress: true
+    branches: [master]
+  workflow_dispatch: # 允许手动触发工作流
 
 jobs:
   build:
-    name: Build
-    # 运行环境，基于矩阵策略
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        type: [web, windows]
-        include:
-          - type: web
-            os: macos-latest
-            path: build
-            output: web
-
-          - type: windows
-            os: windows-latest
-            path: build\windows\x64\runner
-            output: Release
+    runs-on: windows-latest
 
     steps:
-      - name: 代码检出
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      - name: FlutterAction
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '11'
+
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.29.3'
           channel: 'stable'
 
-      - name: 下载依赖
+      - name: Install dependencies
         run: flutter pub get
 
-      - name: 生成代码
-        run: dart run build_runner build
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
 
-      - name: 获取版本号
-        if: ${{ matrix.type != 'windows' }}
+      - name: Build Windows application
+        run: flutter build windows --release
+
+      - name: Create release ZIP
         run: |
-          echo "version=$(awk -F': ' '/version:/ {gsub("\\+", "-", $2); print $2}' pubspec.yaml)" >> "$GITHUB_ENV"
+          Compress-Archive -Path build\windows\runner\Release\* -DestinationPath windows_app.zip
 
-      - name: 获取版本号(windows)
-        if: ${{ matrix.type == 'windows' }}
-        shell: pwsh
-        run: |
-          $version = (Get-Content pubspec.yaml -Raw) -match 'version:\s*([^\s]+)' | Out-Null
-          $version = $Matches[1] -replace '\+', '-'
-          echo "version=$version" | Out-File -Append -Encoding utf8 -FilePath $Env:GITHUB_ENV
-
-      - name: 打印版本号
-        run: |
-          echo "version: ${{ env.version }}"
-
-      - name: 打包WEB
-        if: ${{ matrix.type == 'web' }}
-        run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
-
-      - name: 将web部署到Github Page
-        uses: JamesIves/github-pages-deploy-action@v4
-        if: ${{ matrix.type == 'web' }}
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
         with:
-          token: ${{ secrets.TOKEN }}
-          branch: gh-pages
-          folder: build/web
-          clean: true
-
-      - name: 打包Windows
-        if: ${{ matrix.type == 'windows' }}
-        shell: pwsh
-        run: flutter build windows
-
-      - name: 压缩产物
-        if: ${{ matrix.type == 'web' }}
-        run: |
-          tar -czvf ${{ github.event.repository.name }}-${{ matrix.type }}.tar.gz -C ${{ matrix.path }} ${{ matrix.output }}
-
-      - name: 压缩产物(windows)
-        if: ${{ matrix.type == 'windows' }}
-        shell: pwsh
-        run: |
-          Compress-Archive -Path '${{ matrix.path }}\${{ matrix.output }}' -DestinationPath '${{ github.event.repository.name }}-${{ matrix.type }}.zip'
+          name: windows-build
+          path: windows_app.zip
+          retention-days: 7
