@@ -154,7 +154,7 @@ class CalculationConfigCard extends StatelessWidget {
                   },
                 ),
               );
-            }).toList(),
+            }),
 
             if (filterConditions.isEmpty)
               Padding(

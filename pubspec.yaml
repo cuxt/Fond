@@ -1,7 +1,7 @@
 name: fond
 description: 'A new Flutter project.'
 publish_to: 'none'
-version: 1.0.3+beta-20250511
+version: 1.0.4+beta-20250511
 
 environment:
   sdk: ^3.7.2
@@ -39,7 +39,7 @@ dependencies:
   sqlite3_flutter_libs: ^0.5.20
   path: ^1.9.1
   fl_chart: ^0.65.0
-  file_picker: ^6.2.0
+  file_picker: ^10.1.7
   csv: ^5.1.0
 
 dev_dependencies:

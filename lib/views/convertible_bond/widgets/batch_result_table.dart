@@ -163,7 +163,7 @@ class BatchResultTable extends StatelessWidget {
                   color:
                       index % 2 == 0
                           ? theme.colorScheme.surface
-                          : theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                          : theme.colorScheme.surfaceContainerHighest.withAlpha(50),
                   border: Border(
                     bottom:
                         index < batchResults.length - 1
